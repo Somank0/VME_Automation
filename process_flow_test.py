@@ -1,5 +1,8 @@
+
+# Author : Archana Naik & Somanko Saha
+
 import sys
-sys.path.append('C:/Users/seemalab/Desktop/Root/root_v6.36.000/lib')
+sys.path.append('C:/Users/seemalab/Desktop/Root/root_v6.36.000/lib')  # Path to ROOT libraries (for Windows)
 import ROOT
 import array
 

@@ -1,3 +1,6 @@
+
+# Author : Somanko Saha 
+
 import time
 from caen_libs import caenvme as vme
 
