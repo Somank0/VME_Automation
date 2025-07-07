@@ -2,11 +2,48 @@ from dataclasses import dataclass, field
 import sys
 import csv
 import time
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+
 
 from caen_libs import caenvme as vme
 print("Library version:", vme.lib.sw_release())
 
+# # Parse arguments
+# parser = ArgumentParser(
+#     description=__doc__,
+#     formatter_class=ArgumentDefaultsHelpFormatter,
+# )
+#
+# # Shared parser for subcommands
+# parser.add_argument('-b', '--boardtype', type=str, help='board type', required=True, choices=tuple(i.name for i in vme.BoardType))
+# parser.add_argument('-l', '--linknumber', type=str, help='link number, PID or hostname (depending on connectiontype)', required=True)
+# parser.add_argument('-n', '--conetnode', type=int, help='CONET node', default=0)
+#
+# args = parser.parse_args()
 
+boardtype = vme.BoardType["V1718"]
+linknumber = "0"
+conetnode = 0
+
+# print("Available board types:")
+# for bt in vme.BoardType:
+#     print(f"- {bt.name}")
+#
+# while True:
+#     boardtype_input = input("Enter board type: ").strip()
+#     if boardtype_input in vme.BoardType.__members__:
+#         boardtype = vme.BoardType[boardtype_input]
+#         break
+#     else:
+#         print("Invalid board type. Please try again.")
+#
+# linknumber = input("Enter link number (usually '0' for USB): ").strip()
+#
+# try:
+#     conetnode = int(input("Enter CONET node [default 0]: ") or "0")
+# except ValueError:
+#     print("Invalid CONET node. Defaulting to 0.")
+#     conetnode = 0
 
 
 
@@ -68,14 +105,14 @@ class InteractiveDemo:
         print(f'Value: {value:08x}')
         return value
 
-    def write_cycle(self, write_addr, write_data):
+    def write_cycle(self):
         """Write cycle"""
         print(f'VME base address: {self.__vme_base_address:08x}')
         print(f'Address modifier: {self.__address_modifier.name}')
         print(f'Data width: {self.__data_width.name}')
         try:
-            address = int(write_addr, 16)
-            value = int(write_data, 16)
+            address = int(input('Set address: 0x'), 16)
+            value = int(input('Set value: 0x'), 16)
         except ValueError as ex:
             print(f'Invalid input: {ex}')
             return
@@ -136,3 +173,77 @@ def _quit():
     """Quit"""
     print('Quitting...')
     sys.exit()
+
+
+
+with vme.Device.open(boardtype, linknumber, conetnode) as device:
+    demo = InteractiveDemo(device)
+
+    demo.set_vme_baseaddress("B990000")
+    time.sleep(0.1)
+    demo.set_address_modifier("A24_U_DATA")
+    time.sleep(0.1)
+    # demo.set_data_width("D32")
+    # time.sleep(0.5)
+
+    # Output CSV path
+    csv_filename = "vme_data_output.csv"
+    valid_data_count = 0
+    max_count = 100
+    output_data = []
+
+    print("Starting data acquisition...")
+    # Save collected data to CSV
+    with open(csv_filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Data"])
+
+    while valid_data_count < max_count:
+        # Step 1: Read the status register
+        demo.set_data_width("D16")
+        time.sleep(0.1)
+        status_word = demo.read_cycle("1022")
+        if status_word is None:
+            continue
+
+        # Step 2: Check bit 0 (data available)
+        if not status_word & 0x2:
+            # Read from output buffer at address 0x0000
+
+            demo.set_data_width("D32")
+            time.sleep(0.1)
+            data_word = demo.read_cycle("0000")
+            if data_word is None:
+                continue
+
+            # Check if bits 24–26 are 0
+            if (data_word >> 24) & 0x7 == 0:
+                output_data.append(data_word)
+                valid_data_count += 1
+                print(f"[{valid_data_count}] Data accepted: {data_word:08X}")
+                time.sleep(0.1)
+                with open(csv_filename, mode='w', newline='') as file:
+                    writer = csv.writer(file)
+                    for i, val in enumerate(output_data):
+                        writer.writerow([i + 1, f"{val:08X}"])
+            else:
+                print("Data rejected due to bits 24-26")
+
+        # Optional: Sleep briefly to avoid CPU hogging
+        time.sleep(10)
+
+    # Save collected data to CSV
+    # with open(csv_filename, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(["Data"])
+    #     for i, val in enumerate(output_data):
+    #         writer.writerow([i + 1, f"{val:08X}"])
+
+    print(f"Data acquisition complete. {valid_data_count} entries saved to {csv_filename}")
+
+
+
+
+
+
+
