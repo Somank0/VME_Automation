@@ -8,8 +8,8 @@ class VMEInterface:
     def __init__(self, device):
         self.device = device
         self.base = 0
-        self.am = 0x39
-        self.dw = 0x02
+        self.am = 0x39 # Address Modifier: 0x39 for A24 and 0x09 for A32
+        self.dw = 0x02 # Data Width:  0x02 for D16 and 0x04 for D32
 
     def set_base_address(self, base_addr_hex):
         self.base = int(base_addr_hex, 16)
