@@ -1,6 +1,3 @@
-
-# Author : Archana Naik
-
 import ROOT
 import sys
 import array
